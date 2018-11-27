@@ -7,21 +7,24 @@ namespace Tests
 {
     public class RefinerServiceTest
     {
-
         [SetUp]
         public void Setup()
         {
         }
 
         [Test]
-        public void TestCanLoadSourcesFromJSONFile()
+        public void TestCanPullMessagesFromQueue()
         {
         }
 
         [Test]
-        public void TestCanForwardMessageToQueue()
+        public void TestCanPullMessagesFromDifferentQueues()
         {
         }
 
+        [Test]
+        public void TestCanStoreMessagePayloadInMongoDB()
+        {
+        }
     }
 }
