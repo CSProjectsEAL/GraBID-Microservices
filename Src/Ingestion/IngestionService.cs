@@ -14,23 +14,27 @@ namespace Ingestion
     // for more advanced Message Bus setup - http://masstransit-project.com/MassTransit/ which integrates with RabbitMQ as well
     public class IngestionService
     {
-        private IDictionary<int,IngestionSource> _sourcesList;
-        private const string _sourcesConfigRelativePath = "config/ingestion_sources.json";
+        private IDictionary<string,IngestionSource> _sourcesList;
+        private const string _sourcesConfigRelativePath = "../../../../../config/IngestionSourcesTest.json";
         private ILogger _logger;
-        private static string rabbitmqHostname = "rabbit.docker";
+        private static string _rabbitmqHostname = "rabbit.docker";
 
-        public IngestionService(IDictionary<int, IngestionSource> sources)
+        public IngestionService(IDictionary<string, IngestionSource> sources, ILogger logger)
         {
-
-            _logger = new LoggerConfiguration().WriteTo.Console().CreateLogger();
+            _logger = logger;
             _sourcesList = sources;
         }
+
+        public IngestionService(ILogger logger)
+        {
+            _logger = logger;
+            _sourcesList = LoadSourcesFromJson(_sourcesConfigRelativePath);
+        }
+
         private async Task<string> GetDataAsync(string baseUrl)
         {
             string data = "";
-
             HttpClient client = new HttpClient();
-
             try
             {
                 data = await client.GetStringAsync(baseUrl);
@@ -46,43 +50,43 @@ namespace Ingestion
             return data;
         }
 
-        public IngestionService()
-        {
-            _logger = new LoggerConfiguration().WriteTo.Console().CreateLogger();
-            _sourcesList = LoadSourcesFromJson();
-        }
-
         // Due to sercurity concerns sources are either injected 
         //or loaded from config files
-        private IDictionary<int, IngestionSource> LoadSourcesFromJson() 
+
+        public IDictionary<string, IngestionSource> LoadSourcesFromJson(string path)
         {
-            IDictionary<int, IngestionSource> sources = null;
+            IDictionary<string, IngestionSource> sources = new Dictionary<string, IngestionSource>();
             // deserialize JSON directly from a file
-            if (File.Exists(_sourcesConfigRelativePath)) {
-                string JSONText = File.ReadAllText(_sourcesConfigRelativePath);
-                sources = JsonConvert.DeserializeObject<Dictionary<int, IngestionSource>>(JSONText);
+            if (File.Exists(path))
+            {
+                string JSONText = File.ReadAllText(path);
+                IList<IngestionSource> listsources = JsonConvert.DeserializeObject<IList<IngestionSource>>(JSONText);
+                foreach (IngestionSource s in listsources) {    
+                    sources.Add(s.name, s);
+                }
             }
-            else {
+            else
+            {
                 throw new Exception("Cant find file");
-            } 
+            }
             return sources;
         }
 
-        public void Ingest(int sourceID) {
+        public void Ingest(string sourceID) {
 
             if (!_sourcesList.ContainsKey(sourceID)) throw new Exception("Key was not found, source is not defined");
             // Fetch data
-            Task<string> data = GetDataAsync(_sourcesList[sourceID].ApiUrl);
-            string dataString = data.Result.ToString();
-
+            //Task<string> data = GetDataAsync(_sourcesList[sourceID].ApiUrl);
+            //string dataString = data.Result.ToString();
+            string dataString = "message test";
             _logger.Information("Starting Ingestor");
             ForwardMessageToRabbitMQ(dataString);
             _logger.Information("Stopping Ingestor");
         }
 
-        private void ForwardMessageToRabbitMQ(string message)
+        public void ForwardMessageToRabbitMQ(string message)
         {
-            var factory = new ConnectionFactory() { HostName = rabbitmqHostname };
+            var factory = new ConnectionFactory() { HostName = _rabbitmqHostname };
             using (IConnection conn = factory.CreateConnection())
             {
                 using (IModel channel = conn.CreateModel())
