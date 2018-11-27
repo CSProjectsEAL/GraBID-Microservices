@@ -1,0 +1,14 @@
+[
+  {
+    "name": "ResellerData",
+    "ApiUrl": "https://hal.mono.net/api/v1/admin",
+    "Credential": "b68064b8cf25842a1ea86cd61a7ee5fa",
+    "ForwardMessageQueue": "mono.queue.resellers"
+  },
+  {
+    "name": "ResellerData2",
+    "ApiUrl": "https://hal.mono.net/api/v1/admin",
+    "Credential": "b68064b8cf25842a1ea86cd61a7ee5fa",
+    "ForwardMessageQueue": "mono.queue.resellers"
+  }
+]
