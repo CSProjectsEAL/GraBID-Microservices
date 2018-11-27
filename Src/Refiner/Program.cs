@@ -83,6 +83,7 @@ namespace Refiner
             WaitHandle.WaitOne();
         }
 
+
         private static void Exit()
         {
             Log.Information("Exiting...");
