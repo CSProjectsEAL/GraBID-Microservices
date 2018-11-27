@@ -75,8 +75,6 @@ namespace Logger
             Log.Information("Exiting...");
             channel.Close();
             conn.Close();
-
-
         }
     }
 
