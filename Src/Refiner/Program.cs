@@ -73,6 +73,7 @@ namespace Refiner
 
             };
 
+
             channel.BasicConsume(queue: queueName,
                                  autoAck: true,
                                  consumer: consumer);
