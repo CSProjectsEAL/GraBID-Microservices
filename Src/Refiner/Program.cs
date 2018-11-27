@@ -72,8 +72,6 @@ namespace Refiner
                 Console.WriteLine($" [x] Sent 'mono.data.refined':'{newMessage}'");
 
             };
-
-
             channel.BasicConsume(queue: queueName,
                                  autoAck: true,
                                  consumer: consumer);
@@ -89,11 +87,6 @@ namespace Refiner
             Log.Information("Exiting...");
             channel.Close();
             conn.Close();
-
-           
         }
-
-       
     }
-
 }
