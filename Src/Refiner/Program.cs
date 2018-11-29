@@ -41,6 +41,7 @@ namespace Refiner
             var routingKey = "mono.data.received";
 
             channel.ExchangeDeclare(exchange: exchange, type: "topic");
+            
 
             var queueName = channel.QueueDeclare().QueueName;
 
