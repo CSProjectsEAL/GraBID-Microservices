@@ -49,7 +49,6 @@ namespace Refiner
                                   exchange: exchange,
                                   routingKey: routingKey);
 
-
             var consumer = new EventingBasicConsumer(channel);
 
             consumer.Received += (model, ea) =>
