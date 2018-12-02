@@ -16,6 +16,10 @@ namespace Refiner
 {
     class Program
     {
+        //TODO: Refactor to environment variable config file
+        private static string ConnectionString = "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]";
+    
+
         private static IConnection conn;
 
         private static IModel channel;
@@ -87,8 +91,6 @@ namespace Refiner
             Log.Information("Exiting...");
             channel.Close();
             conn.Close();
-
-           
         }
 
        
