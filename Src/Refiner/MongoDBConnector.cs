@@ -13,8 +13,6 @@ namespace Refiner
         {
             _connectionString = connectionString;
         }
-
-        private 
         
         public bool SaveCollection()
         {
