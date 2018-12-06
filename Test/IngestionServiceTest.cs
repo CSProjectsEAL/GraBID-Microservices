@@ -1,6 +1,8 @@
 using NUnit.Framework;
 using Ingestion;
 using System.Collections.Generic;
+using RabbitMQ.Client;
+using RabbitMQ.Client.Exceptions;
 using Serilog;
 
 namespace Tests
@@ -14,29 +16,39 @@ namespace Tests
         {
             Dictionary<string, IngestionSource> sources = new Dictionary<string, IngestionSource>();
             sources.Add(
-                "Test",new IngestionSource() { ApiUrl = "Example", Credential = "blabla", ForwardMessageQueue = "monoqueue", name = "Test"}
+                "Test",new IngestionSource() { ApiUrl = "Example", Credential = "blabla", ForwardMessageQueue = "monoqueue", Name = "Test"}
             );
             sources.Add(
-                "Test2", new IngestionSource() { ApiUrl = "Example2", Credential = "blabla2", ForwardMessageQueue = "monoqueue2", name = "Test2" }
+                "Test2", new IngestionSource() { ApiUrl = "Example2", Credential = "blabla2", ForwardMessageQueue = "monoqueue2", Name = "Test2" }
+                );
+            sources.Add(
+                "FakeData", new IngestionSource() { ApiUrl = "https://jsonplaceholder.typicode.com/posts", Credential = "", ForwardMessageQueue = "mono.data.received", Name = "FakeData" }
                 );
 
             service = new IngestionService(sources, new LoggerConfiguration().WriteTo.Console().CreateLogger());
         }
 
         [Test]
-        public void TestCanLoadSourcesFromJSONFile()
+        public void CanIngestFromEndpoint()
         {
-            IDictionary<string, IngestionSource> sources = service.LoadSourcesFromJson("../../../../config/IngestionSourcesTest.json");
-            Assert.AreEqual(sources["ResellerData"].name, "ResellerData");
-            Assert.AreEqual(sources["ResellerData2"].name, "ResellerData2");
+            service.Ingest("FakeData");
+            using (IConnection conn = new ConnectionFactory() {HostName = "localhost", UserName = "guest", Password = "guest"}.CreateConnection())
+            {
+                using (IModel channel = conn.CreateModel())
+                {
+                    BasicGetResult result = channel.BasicGet("mono.data.received", false);
+                    Assert.IsNotNull(result);
+                }
+            }
         }
 
         [Test]
-        public void TestCanForwardMessageToQueue()
+        public void TestCanLoadSourcesFromJSONFile()
         {
-            service.LoadSourcesFromJson("../../../../config/IngestionSourcesTest.json");
-            service.ForwardMessageToRabbitMQ("");
+            IDictionary<string, IngestionSource> sources = service.LoadSourcesFromJson("../../../../config/IngestionSourcesTest.json");
+            Assert.AreEqual(sources["ResellerData"].Name, "ResellerData");
+            Assert.AreEqual(sources["ResellerData2"].Name, "ResellerData2");
+            Assert.AreEqual(sources["FakeData"].Name, "FakeData");
         }
-
     }
 }

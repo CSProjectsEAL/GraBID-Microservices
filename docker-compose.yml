@@ -1,5 +1,11 @@
 version: "3"
+
+networks:
+  mongodb_application-network-db:
+    external: true
+    
 services:
+
   rabbit.docker:
    image: rabbitmq:3.7.8-management-alpine
    restart: always     
@@ -7,6 +13,7 @@ services:
    ports:
       - "15672:15672"
       - "5672:5672"
+      
   refiner:
     image: grabid/refiner:local
     build:     
@@ -14,6 +21,9 @@ services:
     depends_on: 
       - rabbit.docker  
     restart: always
+    networks: 
+      - mongodb_application-network-db
+    
   logger:
     image: grabid/logger:local
     build:     
@@ -21,6 +31,7 @@ services:
     depends_on: 
       - rabbit.docker  
     restart: always
+    
   ingestion:
     image: grabid/ingestion:local
     build:      
@@ -28,32 +39,3 @@ services:
     depends_on: 
       - rabbit.docker
     restart: always
-
-  mongodb-primary:
-    image: 'bitnami/mongodb:latest'
-    environment:
-      - MONGODB_REPLICA_SET_MODE=primary
-    volumes:
-      - 'mongodb_master_data:/bitnami'
-
-  mongodb-secondary:
-    image: 'bitnami/mongodb:latest'
-    depends_on:
-      - mongodb-primary
-    environment:
-      - MONGODB_REPLICA_SET_MODE=secondary
-      - MONGODB_PRIMARY_HOST=mongodb-primary
-      - MONGODB_PRIMARY_PORT_NUMBER=27017
-
-  mongodb-arbiter:
-    image: 'bitnami/mongodb:latest'
-    depends_on:
-      - mongodb-primary
-    environment:
-      - MONGODB_REPLICA_SET_MODE=arbiter
-      - MONGODB_PRIMARY_HOST=mongodb-primary
-      - MONGODB_PRIMARY_PORT_NUMBER=27017
-
-volumes:
-  mongodb_master_data:
-    driver: local

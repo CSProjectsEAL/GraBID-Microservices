@@ -33,7 +33,7 @@ namespace Ingestion
 
         private async Task<string> GetDataAsync(string baseUrl)
         {
-            string data = "";
+            var data = "";
             HttpClient client = new HttpClient();
             try
             {
@@ -62,7 +62,7 @@ namespace Ingestion
                 string JSONText = File.ReadAllText(path);
                 IList<IngestionSource> listsources = JsonConvert.DeserializeObject<IList<IngestionSource>>(JSONText);
                 foreach (IngestionSource s in listsources) {    
-                    sources.Add(s.name, s);
+                    sources.Add(s.Name, s);
                 }
             }
             else
@@ -72,35 +72,40 @@ namespace Ingestion
             return sources;
         }
 
-        public void Ingest(string sourceID) {
+        public void Ingest(string sourceId) {
 
-            if (!_sourcesList.ContainsKey(sourceID)) throw new Exception("Key was not found, source is not defined");
-            // Fetch data
-            //Task<string> data = GetDataAsync(_sourcesList[sourceID].ApiUrl);
-            //string dataString = data.Result.ToString();
-            string dataString = "message test";
+            if (!_sourcesList.ContainsKey(sourceId)) throw new Exception("Key was not found, source is not defined");
             _logger.Information("Starting Ingestor");
-            ForwardMessageToRabbitMQ(dataString);
+            
+            var data = GetDataAsync(_sourcesList[sourceId].ApiUrl).ToString();
+            
+            ForwardMessageToRabbitMQ(data, _sourcesList[sourceId].ForwardMessageQueue);
+            
             _logger.Information("Stopping Ingestor");
         }
 
-        public void ForwardMessageToRabbitMQ(string message)
+        public void ForwardMessageToRabbitMQ(string message, string queue)
         {
-            var factory = new ConnectionFactory() { HostName = _rabbitmqHostname };
+            var factory = new ConnectionFactory();
             using (IConnection conn = factory.CreateConnection())
             {
                 using (IModel channel = conn.CreateModel())
                 {
-                    var exchange = "grabid_exchange";
-                    var routingKey = "mono.data.received";
-
-                    channel.ExchangeDeclare(exchange: exchange, type: "topic");
+                    var exchange = "mono.data.received";
+                    
+                    channel.QueueDeclare(queue, true, false, false, null);
+                    
+                    channel.ExchangeDeclare(exchange: exchange, type: "fanout");
+                    
+                    channel.QueueBind(queue, exchange, "");
+                    
                     var envelope = new Envelope<string>(Guid.NewGuid(), message);
                     var envelopedMessage = JsonConvert.SerializeObject(envelope);
+                    
                     byte[] messageBodyBytes = System.Text.Encoding.UTF8.GetBytes(envelopedMessage);
 
-                    channel.BasicPublish(exchange, routingKey, null, messageBodyBytes);
-                    Console.WriteLine(" [x] Sent '{0}':'{1}'", routingKey, message);
+                    channel.BasicPublish(exchange, null, null, messageBodyBytes);
+                    Console.WriteLine(" [x] Sent '{0}':'{1}'", exchange, message);
                 }
             }
         }

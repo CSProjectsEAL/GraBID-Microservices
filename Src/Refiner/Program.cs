@@ -11,6 +11,7 @@ using System.Linq;
 using System.Runtime.Loader;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Refiner
 {
@@ -32,56 +33,61 @@ namespace Refiner
                 .CreateLogger();
 
             Log.Information("Starting...");
-
-            var factory = new ConnectionFactory() { HostName = "rabbit.docker" };
-            conn = factory.CreateConnection();
-            channel = conn.CreateModel();
-
-            var exchange = "grabid_exchange";
-            var routingKey = "mono.data.received";
-
-            channel.ExchangeDeclare(exchange: exchange, type: "topic");
-
-            var queueName = channel.QueueDeclare().QueueName;
-
-            channel.QueueBind(queue: queueName,
-                                  exchange: exchange,
-                                  routingKey: routingKey);
-
-
-            var consumer = new EventingBasicConsumer(channel);
-
-            consumer.Received += (model, ea) =>
-            {
-                var body = ea.Body;
-                var message = Encoding.UTF8.GetString(body);
-                var key = ea.RoutingKey;
-                Console.WriteLine($" [x] Received '{key}':'{message}'");
-                var envelope = JsonConvert.DeserializeObject<Envelope<string>>(message);
-
-                dynamic json = JObject.Parse(envelope.Payload);
-                string messageString = json.message;
-                string userString = json.users;
-                string[] userArray = userString.Split(",");
-                string[] messages = userArray.Select(user => { return $"{messageString} {user}"; }).ToArray();
-                var returnEnvelope = new Envelope<string[]>(envelope.Id, messages);
-                string newMessage = JsonConvert.SerializeObject(returnEnvelope);
-                byte[] messageBodyBytes = Encoding.UTF8.GetBytes(newMessage);
-
-                channel.BasicPublish(exchange, "mono.data.refined", null, messageBodyBytes);
-                Console.WriteLine($" [x] Sent 'mono.data.refined':'{newMessage}'");
-
-            };
-            channel.BasicConsume(queue: queueName,
-                                 autoAck: true,
-                                 consumer: consumer);
-
+            
+            RetrieveMessageFromQueue("mono.data.received");
+            
             Log.Information("Started");
 
             WaitHandle.WaitOne();
         }
 
+        public static void RetrieveMessageFromQueue (string queue)
+        {
+            var factory = new ConnectionFactory();
+            using (IConnection conn = factory.CreateConnection())
+            {
+                using (IModel channel = conn.CreateModel())
+                {
+                    var exchange = "mono.data.received";
 
+                    channel.QueueDeclare(queue, true, false, false, null);
+
+                    channel.ExchangeDeclare(exchange: exchange, type: "fanout");
+
+                    channel.QueueBind(queue, exchange, "");
+
+                    var consumer = new EventingBasicConsumer(channel);
+
+                    consumer.Received += (model, ea) =>
+                    {
+                        var body = ea.Body;
+                        var message = Encoding.UTF8.GetString(body);
+                        var key = ea.RoutingKey;
+                        Console.WriteLine($" [x] Received '{key}':'{message}'");
+                        var envelope = JsonConvert.DeserializeObject<Envelope<string>>(message);
+
+                        var processor = new DataProcessor(envelope);
+                        var cleanData = processor.ParseEnvelope();
+                        
+                        ForwardMessageToQueue(channel, "mono.data.refined", cleanData);
+                        
+                        Console.WriteLine($" [x] Sent 'mono.data.refined':'{cleanData}'");
+                    };
+                    
+                    channel.BasicConsume(queue: queue,
+                        autoAck: true,
+                        consumer: consumer);
+                }
+            }
+        }
+
+        public static void ForwardMessageToQueue (IModel channel, string queue, JArray cleanData)
+        {
+            var message = JsonConvert.SerializeObject(cleanData);
+            byte[] messageBodyBytes = System.Text.Encoding.UTF8.GetBytes(message);
+            channel.BasicPublish(queue, null, null, messageBodyBytes);
+        }
+        
         private static void Exit()
         {
             Log.Information("Exiting...");
