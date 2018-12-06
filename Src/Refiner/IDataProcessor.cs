@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Refiner
 {
-    public interface IDataProcessor
+    interface IDataProcessor
     {
         string Process(string data);
     }

@@ -17,73 +17,38 @@ namespace Refiner
     class Program
     {
         //TODO: Refactor to environment variable config file
-        private static string ConnectionString = "mongodb://[username:password@]host1[:port1][,host2[:port2],...[,hostN[:portN]]][/[database][?options]]";
+        private static string ConnectionString;
     
 
-        private static IConnection conn;
+        private static void Instanciate() {
+            ConnectionString = "";
 
-        private static IModel channel;
-        private static readonly AutoResetEvent WaitHandle = new AutoResetEvent(false);
+            //Queue, processors
+            IDictionary<string, List<IDataProcessor>> processors = new Dictionary<string, List<IDataProcessor>>();
+
+            //Refiner service with definitions
+            MongoDBConnector connector = new MongoDBConnector(ConnectionString);
+            RService = new RefinerService(connector);
+            
+            // Logger
+            Log.Logger = new LoggerConfiguration()
+            .Enrich.WithProperty("name", typeof(Program).Assembly.GetName().Name)
+            .WriteTo.Console()
+            .CreateLogger();
+        }
+
+        private static void Startup()
+        {
+            Log.Information("Starting...");
+            AssemblyLoadContext.Default.Unloading += _ => Exit();
+            Console.CancelKeyPress += (_, __) => Exit();
+            Instanciate();
+        }
 
         static void Main(string[] args)
         {
-            AssemblyLoadContext.Default.Unloading += _ => Exit();
-            Console.CancelKeyPress += (_, __) => Exit();
-
-            Log.Logger = new LoggerConfiguration()
-                .Enrich.WithProperty("name", typeof(Program).Assembly.GetName().Name)
-                .WriteTo.Console()
-                .CreateLogger();
-
-            Log.Information("Starting...");
-
-            var factory = new ConnectionFactory() { HostName = "rabbit.docker" };
-            conn = factory.CreateConnection();
-            channel = conn.CreateModel();
-
-            var exchange = "grabid_exchange";
-            var routingKey = "mono.data.received";
-
-            channel.ExchangeDeclare(exchange: exchange, type: "topic");
-            
-
-            var queueName = channel.QueueDeclare().QueueName;
-
-            channel.QueueBind(queue: queueName,
-                                  exchange: exchange,
-                                  routingKey: routingKey);
-
-            var consumer = new EventingBasicConsumer(channel);
-
-            consumer.Received += (model, ea) =>
-            {
-                var body = ea.Body;
-                var message = Encoding.UTF8.GetString(body);
-                var key = ea.RoutingKey;
-                Console.WriteLine($" [x] Received '{key}':'{message}'");
-                var envelope = JsonConvert.DeserializeObject<Envelope<string>>(message);
-
-                dynamic json = JObject.Parse(envelope.Payload);
-                string messageString = json.message;
-                string userString = json.users;
-                string[] userArray = userString.Split(",");
-                string[] messages = userArray.Select(user => { return $"{messageString} {user}"; }).ToArray();
-                var returnEnvelope = new Envelope<string[]>(envelope.Id, messages);
-                string newMessage = JsonConvert.SerializeObject(returnEnvelope);
-                byte[] messageBodyBytes = Encoding.UTF8.GetBytes(newMessage);
-
-                channel.BasicPublish(exchange, "mono.data.refined", null, messageBodyBytes);
-                Console.WriteLine($" [x] Sent 'mono.data.refined':'{newMessage}'");
-
-            };
-
-            channel.BasicConsume(queue: queueName,
-                                 autoAck: true,
-                                 consumer: consumer);
-
-            Log.Information("Started");
-
-            WaitHandle.WaitOne();
+            //Application Startup
+            Startup();
         }
 
         private static void Exit()
@@ -92,8 +57,6 @@ namespace Refiner
             channel.Close();
             conn.Close();
         }
-
-       
     }
 
 }
