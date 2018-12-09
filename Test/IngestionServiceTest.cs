@@ -37,7 +37,7 @@ namespace Tests
                 using (IModel channel = conn.CreateModel())
                 {
                     BasicGetResult result = channel.BasicGet("mono.data.received", false);
-                    Assert.IsNotNull(result);
+                    Assert.IsNotNull(result.Body);
                 }
             }
         }

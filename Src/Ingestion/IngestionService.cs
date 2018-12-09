@@ -10,48 +10,48 @@ using Shared;
 
 namespace Ingestion
 {
-    //Read about Rabbitmq - https://www.rabbitmq.com/tutorials/tutorial-five-dotnet.html
-    // for more advanced Message Bus setup - http://masstransit-project.com/MassTransit/ which integrates with RabbitMQ as well
     public class IngestionService
     {
         private IDictionary<string,IngestionSource> _sourcesList;
-        private const string _sourcesConfigRelativePath = "../../../../../config/IngestionSourcesTest.json";
+        private const string SourcesConfigRelativePath = "../../../../../config/IngestionSourcesTest.json";
         private ILogger _logger;
-        private static string _rabbitmqHostname = "rabbit.docker";
+        private static IConnection _conn;
+        private static IModel _channel;
 
         public IngestionService(IDictionary<string, IngestionSource> sources, ILogger logger)
         {
             _logger = logger;
+            IConnectionFactory factory = new ConnectionFactory() {HostName = "localhost", UserName = "guest", Password = "guest"};
+            _conn = factory.CreateConnection();
+            _channel = _conn.CreateModel();
             _sourcesList = sources;
         }
 
         public IngestionService(ILogger logger)
         {
             _logger = logger;
-            _sourcesList = LoadSourcesFromJson(_sourcesConfigRelativePath);
+            _sourcesList = LoadSourcesFromJson(SourcesConfigRelativePath);
+            IConnectionFactory factory = new ConnectionFactory() {HostName = "localhost", UserName = "guest", Password = "guest"};
+            _conn = factory.CreateConnection();
+            _channel = _conn.CreateModel();
         }
 
-        private async Task<string> GetDataAsync(string baseUrl)
+        private async Task<string> GetData (string url)
         {
             var data = "";
-            HttpClient client = new HttpClient();
-            try
+            using (var client = new HttpClient())
             {
-                data = await client.GetStringAsync(baseUrl);
+                using (var res = await client.GetAsync(url))
+                {
+                    using (var content = res.Content)
+                    {
+                        data = await content.ReadAsStringAsync();
+                    }
+                }
+            }
 
-                Console.WriteLine(data);
-            }
-            catch (HttpRequestException e)
-            {
-                Console.WriteLine("\nException Caught!");
-                Console.WriteLine("Message :{0} ", e.Message);
-            }
-            client.Dispose();
             return data;
         }
-
-        // Due to sercurity concerns sources are either injected 
-        //or loaded from config files
 
         public IDictionary<string, IngestionSource> LoadSourcesFromJson(string path)
         {
@@ -75,9 +75,10 @@ namespace Ingestion
         public void Ingest(string sourceId) {
 
             if (!_sourcesList.ContainsKey(sourceId)) throw new Exception("Key was not found, source is not defined");
-            _logger.Information("Starting Ingestor");
             
-            var data = GetDataAsync(_sourcesList[sourceId].ApiUrl).ToString();
+            _logger.Information("Starting Ingestor");
+
+            var data = GetData(_sourcesList[sourceId].ApiUrl).Result;
             
             ForwardMessageToRabbitMQ(data, _sourcesList[sourceId].ForwardMessageQueue);
             
@@ -86,25 +87,24 @@ namespace Ingestion
 
         public void ForwardMessageToRabbitMQ(string message, string queue)
         {
-            var factory = new ConnectionFactory();
-            using (IConnection conn = factory.CreateConnection())
+            using (_conn)
             {
-                using (IModel channel = conn.CreateModel())
+                using (_channel)
                 {
                     var exchange = "mono.data.received";
                     
-                    channel.QueueDeclare(queue, true, false, false, null);
+                    _channel.QueueDeclare(queue, true, false, false, null);
                     
-                    channel.ExchangeDeclare(exchange: exchange, type: "fanout");
+                    _channel.ExchangeDeclare(exchange, "fanout");
                     
-                    channel.QueueBind(queue, exchange, "");
+                    _channel.QueueBind(queue, exchange, "");
                     
                     var envelope = new Envelope<string>(Guid.NewGuid(), message);
                     var envelopedMessage = JsonConvert.SerializeObject(envelope);
                     
                     byte[] messageBodyBytes = System.Text.Encoding.UTF8.GetBytes(envelopedMessage);
 
-                    channel.BasicPublish(exchange, null, null, messageBodyBytes);
+                    _channel.BasicPublish(exchange, "", _channel.CreateBasicProperties(), messageBodyBytes);
                     Console.WriteLine(" [x] Sent '{0}':'{1}'", exchange, message);
                 }
             }
@@ -117,7 +117,7 @@ namespace Ingestion
 
         public void StoreObject(string obj) { 
             try {
-                File.WriteAllText(_sourcesConfigRelativePath, obj);
+                File.WriteAllText(SourcesConfigRelativePath, obj);
             } catch(Exception exception)
             {
                 Console.WriteLine("Couldnt write to file: " + exception.Message + "Message");

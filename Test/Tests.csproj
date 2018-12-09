@@ -10,5 +10,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Src\Ingestion\Ingestion.csproj" />
+    <ProjectReference Include="..\src\Refiner\Refiner.csproj" />
   </ItemGroup>
 </Project>
