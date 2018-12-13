@@ -11,52 +11,43 @@ using System.Linq;
 using System.Runtime.Loader;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Refiner
 {
     class Program
     {
-        //TODO: Refactor to environment variable config file
-        private static string ConnectionString;
-    
-
-        private static void Instanciate() {
-            ConnectionString = "";
-
-            //Queue, processors
-            IDictionary<string, List<IDataProcessor>> processors = new Dictionary<string, List<IDataProcessor>>();
-
-            //Refiner service with definitions
-            MongoDBConnector connector = new MongoDBConnector(ConnectionString);
-            RService = new RefinerService(connector);
-            
-            // Logger
-            Log.Logger = new LoggerConfiguration()
-            .Enrich.WithProperty("name", typeof(Program).Assembly.GetName().Name)
-            .WriteTo.Console()
-            .CreateLogger();
-        }
-
-        private static void Startup()
-        {
-            Log.Information("Starting...");
-            AssemblyLoadContext.Default.Unloading += _ => Exit();
-            Console.CancelKeyPress += (_, __) => Exit();
-            Instanciate();
-        }
+        private static readonly AutoResetEvent WaitHandle = new AutoResetEvent(false);
 
         static void Main(string[] args)
         {
-            //Application Startup
-            Startup();
+            //To make sure the console application doesn't exit and shutdown the container. And it needs to keep listening on ports.
+            AssemblyLoadContext.Default.Unloading += _ => Exit();
+            Console.CancelKeyPress += (_, __) => Exit();
+
+
+            // TODO: Instantiation should be refatored to environment config files
+           IConnectionFactory factory = new ConnectionFactory() { HostName = "localhost", UserName = "guest", Password = "guest" };
+
+            Log.Logger = new LoggerConfiguration()
+                .Enrich.WithProperty("name", typeof(Program).Assembly.GetName().Name)
+                .WriteTo.Console()
+                .CreateLogger();
+
+            Log.Information("Starting...");
+            
+            RefinerService refiner = new RefinerService(Log.Logger, factory);
+            
+            refiner.RetrieveMessageFromQueue("mono.data.received");
+            
+            Log.Information("Started");
+
+            WaitHandle.WaitOne();
         }
 
         private static void Exit()
         {
             Log.Information("Exiting...");
-            channel.Close();
-            conn.Close();
         }
     }
-
 }
