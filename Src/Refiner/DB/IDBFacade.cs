@@ -4,8 +4,9 @@ namespace Refiner
 {
     public interface IDBFacade
     {
-        void SaveCollection(JArray collection, string collectionName, string databaseName);
+        void SaveCollection(string collection, string collectionName, string databaseName);
         string FetchCollection(string collectionName, string databaseName);
-        string GetLatestID(string id, string collectionName, string databaseName);
+        string FetchCollection(string collectionName, string databaseName, string fromId);
+        string LatestID(string collectionName, string databaseName);
     }
 }
