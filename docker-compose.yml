@@ -1,4 +1,9 @@
 version: "3"
+
+networks:
+  mongodb_application-network-db:
+    external: true
+    
 services:
 
   rabbit.docker:
@@ -8,6 +13,7 @@ services:
    ports:
       - "15672:15672"
       - "5672:5672"
+      
   refiner:
     image: grabid/refiner:local
     build:     
@@ -15,6 +21,9 @@ services:
     depends_on: 
       - rabbit.docker  
     restart: always
+    networks: 
+      - mongodb_application-network-db
+    
   logger:
     image: grabid/logger:local
     build:     
@@ -22,6 +31,7 @@ services:
     depends_on: 
       - rabbit.docker  
     restart: always
+    
   ingestion:
     image: grabid/ingestion:local
     build:      
@@ -29,14 +39,3 @@ services:
     depends_on: 
       - rabbit.docker
     restart: always
-
-
-
-
-
-
-    
-  
-
-
-
