@@ -27,8 +27,8 @@ namespace Refiner
 
 
             // TODO: Instantiation should be refatored to environment config files
-           IConnectionFactory factory = new ConnectionFactory() { HostName = "localhost", UserName = "guest", Password = "guest" };
-
+            IConnectionFactory factory = new ConnectionFactory() { HostName = "localhost", UserName = "guest", Password = "guest" };
+            string exchangeName = "mono.data.received";
             Log.Logger = new LoggerConfiguration()
                 .Enrich.WithProperty("name", typeof(Program).Assembly.GetName().Name)
                 .WriteTo.Console()
@@ -36,9 +36,9 @@ namespace Refiner
 
             Log.Information("Starting...");
             
-            RefinerService refiner = new RefinerService(Log.Logger, factory);
-            
-            refiner.RetrieveMessageFromQueue("mono.data.received");
+            RefinerService refiner = new RefinerService(Log.Logger, factory, exchangeName);
+
+            refiner.Start();
             
             Log.Information("Started");
 

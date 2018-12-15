@@ -1,16 +1,22 @@
-﻿using System;
+﻿using Serilog;
+using Shared;
 using System.Collections.Generic;
-using System.Text;
 
 namespace Refiner
 {
-    class DataSource
+    public class DataSource
     {
         public string Topic { get; set; }
-
-        public StartListening()
+        public string Exchange { get; set; }
+        public IList<DataHandler> DataHandlers {get;set;}
+        public void Process(Envelope<string> envelope)
         {
-
+            foreach (DataHandler d in DataHandlers)
+            {
+                string data = d.Process(envelope.Payload);
+                
+            }
+            Log.Information("Data successfully processed");
         }
     }
 }

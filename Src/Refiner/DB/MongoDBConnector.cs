@@ -68,15 +68,7 @@ namespace Refiner
             }
         }
 
-        private void ConvertJsonCollectionToBsonDocuments()
-        {
-            foreach ()
-            {
-
-            }
-        }
-
-        public string FetchCollection(string id, string collectionName, string databaseName)
+        public string FetchCollection(string collectionName, string databaseName, string fromId = null)
         {
             string collectionToString = "";
             
@@ -116,6 +108,11 @@ namespace Refiner
             string completeMsg = msg + ", Message: " + e.Message + ", Trace: " + "/n" + e.StackTrace;
             _logger.Error(completeMsg);
             throw new Exception(completeMsg);
+        }
+
+        public string FetchCollection(string collectionName, string databaseName)
+        {
+            throw new NotImplementedException();
         }
     }
 }

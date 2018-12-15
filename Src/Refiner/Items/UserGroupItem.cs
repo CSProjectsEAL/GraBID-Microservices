@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Refiner
 {
-    class UserGroupItem
+    public class UserGroupItem
     {
         public string ID { get; set; }
     }
