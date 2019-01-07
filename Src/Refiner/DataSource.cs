@@ -6,17 +6,12 @@ namespace Refiner
 {
     public class DataSource
     {
-        public string Topic { get; set; }
-        public string Exchange { get; set; }
+        public string KeyOrigin { get; set; }
         public IList<DataHandler> DataHandlers {get;set;}
-        public void Process(Envelope<string> envelope)
+
+        public override string ToString()
         {
-            foreach (DataHandler d in DataHandlers)
-            {
-                string data = d.Process(envelope.Payload);
-                
-            }
-            Log.Information("Data successfully processed");
+            return $"[{nameof(KeyOrigin)}={KeyOrigin}],[Number of {nameof(DataHandlers)}={DataHandlers.Count}]";
         }
     }
 }

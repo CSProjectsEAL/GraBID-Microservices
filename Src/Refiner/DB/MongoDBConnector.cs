@@ -9,7 +9,6 @@ namespace Refiner
     public class MongoDBConnector : IDBFacade
     {
         private static string _connectionString;
-        private static ILogger _logger;
         private static MongoClient _dbConnection;
         private MongoClient _MongoDBClient
         {
@@ -52,15 +51,15 @@ namespace Refiner
             return MongoDB.Bson.Serialization.BsonSerializer.Deserialize<BsonDocument>(json);
         }
 
+
         public void SaveCollection(string collection, string collectionName, string databaseName)
         {
             try
             {
              var database = _MongoDBClient.GetDatabase(databaseName);
-             IList<BsonDocument> collectionAsDocuments = ConvertJsonCollectionToBsonDocuments();
+             BsonDocument collectionAsDocument = ConvertFromJsonToBson(collection);
              var dbCollection = database.GetCollection<BsonDocument>(collectionName);
-             dbCollection.InsertManyAsync(collectionAsDocuments);
-
+             dbCollection.InsertOne(collectionAsDocument);
             }
             catch (MongoClientException e)
             {
@@ -68,7 +67,7 @@ namespace Refiner
             }
         }
 
-        public string FetchCollection(string collectionName, string databaseName, string fromId = null)
+        public string FetchCollection(string collectionName, string databaseName)
         {
             string collectionToString = "";
             
@@ -76,8 +75,11 @@ namespace Refiner
             {
                 //Creates database if it doesn't exist
                 var database = _MongoDBClient.GetDatabase(databaseName);
-                collectionToString = database.GetCollection<BsonDocument>(collectionName).ToJson();
-                
+                var collection = database.GetCollection<BsonDocument>(collectionName).Find(new BsonDocument()).ToList();
+                foreach (BsonDocument item in collection)
+                {
+                    collectionToString += item.ToJson();
+                }
             }
             catch (MongoClientException e)
             {
@@ -106,11 +108,11 @@ namespace Refiner
         private void LogAndThrow(string msg, MongoException e)
         {
             string completeMsg = msg + ", Message: " + e.Message + ", Trace: " + "/n" + e.StackTrace;
-            _logger.Error(completeMsg);
+            Log.Error(completeMsg);
             throw new Exception(completeMsg);
         }
 
-        public string FetchCollection(string collectionName, string databaseName)
+        public string FetchCollection(string collectionName, string databaseName, string fromId)
         {
             throw new NotImplementedException();
         }
