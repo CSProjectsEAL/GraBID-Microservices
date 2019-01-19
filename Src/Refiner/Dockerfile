@@ -8,6 +8,6 @@ RUN dotnet publish --no-restore -c Release -o /app
 FROM microsoft/dotnet:2.1-runtime-alpine
 COPY --from=publish /app /var/app
 COPY entrypoint.sh /var/app
-#COPY wait-for-it.sh /var/app
-#RUN apk add bash 
-#CMD ["bash","/var/app/wait-for-it.sh","localhost:5672","--timeout=30","--","/var/app/entrypoint.sh"]
+COPY wait-for-it.sh /var/app
+RUN apk add bash 
+CMD ["bash", "/var/app/wait-for-it.sh", "rabbit.docker:5672", "--timeout=30","--", "/var/app/entrypoint.sh"]

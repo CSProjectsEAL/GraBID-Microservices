@@ -26,7 +26,7 @@ namespace Refiner
             }
             catch (RabbitMQ.Client.Exceptions.BrokerUnreachableException e)
             {
-                Log.Error("Couldn't establish connection to RabbitMQ, Msg: " + e.Message + ", Trace:" + e.StackTrace);
+                Log.Error("Couldn't establish connection to RabbitMQ, /n Msg: " + e.Message + ", Trace:" + e.StackTrace);
             }
             _channel = _conn.CreateModel();
             _dataSources = dataSources;
@@ -56,15 +56,18 @@ namespace Refiner
 
         private void StartListening()
         {
+            _channel.ExchangeDeclare(_exchange, "topic");
+
             var queueName = _channel.QueueDeclare().QueueName;
 
             _channel.QueueDeclare(queueName, true, false, false, null);
 
-            _channel.ExchangeDeclare(_exchange, "fanout");
-
-            _channel.QueueBind(queueName, _exchange, "");
+            _channel.QueueBind(queue: queueName,
+                                  exchange: _exchange,
+                                  routingKey: "mono.data.refined");
 
             var consumer = new EventingBasicConsumer(_channel);
+
             consumer.Received += (model, ea) =>
             {
                 var body = ea.Body;
@@ -74,12 +77,13 @@ namespace Refiner
                 var envelope = JsonConvert.DeserializeObject<Envelope<string>>(message);
 
                 DataSource source = GetDataSource(key);
+
                 if (source != null)
                 {
                     foreach(DataHandler handler in source.DataHandlers)
                     {
-                        string processedData = handler.Handle(envelope.Payload);
-                        ForwardMessageToQueue(handler.Destination, processedData);
+                        dynamic processedData = handler.Handle(envelope.Payload);
+                        ForwardMessageToQueue(handler.Destination, processedData, envelope.Id);
                     }
                 }
                 else
@@ -90,25 +94,18 @@ namespace Refiner
             _channel.BasicConsume(queueName, autoAck: true, consumer: consumer);
         }
 
-        private void ForwardMessageToQueue(string key, dynamic cleanData)
+        private void ForwardMessageToQueue(string destination, dynamic processedData, Guid id)
         {
-            var message = JsonConvert.SerializeObject(cleanData);
+            JArray jdata = processedData;
+            var message = JsonConvert.SerializeObject(jdata.ToString());
             byte[] messageBodyBytes = Encoding.UTF8.GetBytes(message);
-            
-            using (_conn)
-            {
-                using (_channel)
-                {
-                    _channel.QueueDeclare(key, true, false, false, null);
-                    
-                    _channel.ExchangeDeclare(_exchange, "fanout");
-                    
-                    _channel.QueueBind(key, _exchange, "");
+           
+            var returnEnvelope = new Envelope<string>(id, message);
+            string newMessage = JsonConvert.SerializeObject(returnEnvelope);
 
-                    _channel.BasicPublish(key, "", _channel.CreateBasicProperties(), messageBodyBytes);
-                    Log.Information(" [x] Sent '{0}':'{1}'", _exchange, message);
-                }
-            }
+            _channel.BasicPublish(_exchange, destination, null, messageBodyBytes);
+            Log.Information($" [x] Sent 'mono.data.refined':'{newMessage}'");
+
         }
     }
 }

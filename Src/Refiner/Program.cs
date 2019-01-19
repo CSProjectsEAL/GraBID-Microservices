@@ -10,8 +10,8 @@ namespace Refiner
 {
     class Program
     {
-        private static readonly AutoResetEvent WaitHandle = new AutoResetEvent(false);
-        private static RefinerService _refiner;
+        private static AutoResetEvent WaitHandle = new AutoResetEvent(false);
+        private static RefinerService _refiner = null;
         static void Main(string[] args)
         {
             StartupApplication();

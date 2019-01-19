@@ -20,7 +20,6 @@ namespace Refiner
             foreach (dynamic obj in data)
             {
                 dynamic entry = new JObject();
-                //processedData = data; 
                 // Clean data by means of extracting only what is needed.
                 // Restructure data for ease of access and understability when creating queries
                 entry.Reseller = new JObject();
@@ -29,32 +28,31 @@ namespace Refiner
                 entry.Bill = new JObject();
 
                 // Correct structure of usergroups, to an enum array with user group classifiers
-                if (obj.userGroup != null) { 
+                if (obj.userGroup != null)
+                {
                     string userGroupStr = obj.userGroup;
-                    string[] userGroups =  userGroupStr.Split(", ");
+                    string[] userGroups = userGroupStr.Split(", ");
+                    entry.UserGroups = new JArray(userGroups);
                 }
-                //entry.UserGroups = new JArray(userGroups);
-
                 // Extracting values and placing them in the correct objects.
                 entry.Reseller.Id = obj.resellerId;
                 entry.Reseller.Name = obj.resellerName;
                 entry.Reseller.Discount = obj.discount;
-                
-                entry.User.AccountId = obj.accountId;
-                
-                entry.Name = obj.subscriptionName;
-                
-                entry.Type = obj.type;
-                entry.State = obj.state;
-                entry.Price = obj.price;
-                entry.OnExpiry = obj.onExpiry;
-                entry.StartDate = obj.startDate;
-                entry.ExpiryDate = obj.expiryDate;
 
-                entry.BillingDate = obj.billingDate;
-                entry.DiscountedPrice = obj.discountedPrice;
-                entry.CurrencyName = obj.currencyName;
-                entry.CurrencyISO = obj.code;
+                entry.User.AccountId = obj.accountId;
+
+                entry.Subscription.Name = obj.subscriptionName;
+                entry.Subscription.Type = obj.type;
+                entry.Subscription.State = obj.state;
+                entry.Subscription.Price = obj.price;
+                entry.Subscription.StartDate = obj.startDate;
+                entry.Subscription.ExpiryDate = obj.expiryDate;
+
+                entry.Bill.BillingDate = obj.billingDate;
+                entry.Bill.DiscountedPrice = obj.discountedPrice;
+                entry.Bill.CurrencyName = obj.currencyName;
+                entry.Bill.CurrencyISO = obj.code;
+
 
                 processedData.Add(entry);
             }

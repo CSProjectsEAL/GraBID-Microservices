@@ -21,7 +21,7 @@ namespace Refiner
             _db = db;
         }
 
-        public string Handle(string data)
+        public dynamic Handle(string data)
         {
             string processedData = _processor.Process(data);
             if (_db != null) {
