@@ -3,10 +3,8 @@ COPY . ./build
 WORKDIR /build/
 RUN dotnet restore 
 RUN dotnet build --no-restore -c Release -o /app
-
 FROM build AS publish
 RUN dotnet publish --no-restore -c Release -o /app
-
 FROM microsoft/dotnet:2.1-runtime-alpine
 COPY --from=publish /app /var/app
 COPY entrypoint.sh /var/app

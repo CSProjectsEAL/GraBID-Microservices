@@ -1,97 +1,74 @@
 ﻿
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using RabbitMQ.Client;
-using RabbitMQ.Client.Events;
 using Serilog;
-using Shared;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.Loader;
-using System.Text;
 using System.Threading;
 
 namespace Refiner
 {
     class Program
     {
-        private static IConnection conn;
-
-        private static IModel channel;
-        private static readonly AutoResetEvent WaitHandle = new AutoResetEvent(false);
-
+        private static AutoResetEvent WaitHandle = new AutoResetEvent(false);
+        private static RefinerService _refiner = null;
         static void Main(string[] args)
         {
-            AssemblyLoadContext.Default.Unloading += _ => Exit();
-            Console.CancelKeyPress += (_, __) => Exit();
-
-            Log.Logger = new LoggerConfiguration()
-                .Enrich.WithProperty("name", typeof(Program).Assembly.GetName().Name)
-                .WriteTo.Console()
-                .CreateLogger();
-
-            Log.Information("Starting...");
-
-            var factory = new ConnectionFactory() { HostName = "rabbit.docker" };
-            conn = factory.CreateConnection();
-            channel = conn.CreateModel();
-
-            var exchange = "grabid_exchange";
-            var routingKey = "mono.data.received";
-
-            channel.ExchangeDeclare(exchange: exchange, type: "topic");
-
-            var queueName = channel.QueueDeclare().QueueName;
-
-            channel.QueueBind(queue: queueName,
-                                  exchange: exchange,
-                                  routingKey: routingKey);
-
-
-            var consumer = new EventingBasicConsumer(channel);
-
-            consumer.Received += (model, ea) =>
-            {
-                var body = ea.Body;
-                var message = Encoding.UTF8.GetString(body);
-                var key = ea.RoutingKey;
-                Console.WriteLine($" [x] Received '{key}':'{message}'");
-                var envelope = JsonConvert.DeserializeObject<Envelope<string>>(message);
-
-                dynamic json = JObject.Parse(envelope.Payload);
-                string messageString = json.message;
-                string userString = json.users;
-                string[] userArray = userString.Split(",");
-                string[] messages = userArray.Select(user => { return $"{messageString} {user}"; }).ToArray();
-                var returnEnvelope = new Envelope<string[]>(envelope.Id, messages);
-                string newMessage = JsonConvert.SerializeObject(returnEnvelope);
-                byte[] messageBodyBytes = Encoding.UTF8.GetBytes(newMessage);
-
-                channel.BasicPublish(exchange, "mono.data.refined", null, messageBodyBytes);
-                Console.WriteLine($" [x] Sent 'mono.data.refined':'{newMessage}'");
-
-            };
-
-            channel.BasicConsume(queue: queueName,
-                                 autoAck: true,
-                                 consumer: consumer);
-
-            Log.Information("Started");
-
+            StartupApplication();
             WaitHandle.WaitOne();
         }
 
         private static void Exit()
         {
-            Log.Information("Exiting...");
-            channel.Close();
-            conn.Close();
-
-           
+            Log.Information("Exiting refiner service gracefully...");
+            _refiner.Stop();
         }
 
-       
-    }
+        private static void StartupApplication()
+        {
+            Log.Information("Starting refiner service...");
+            Log.Logger = new LoggerConfiguration()
+            .Enrich.WithProperty("name", typeof(Program).Assembly.GetName().Name)
+            .WriteTo.Console()
+            .CreateLogger();
 
+            //To make sure the console application doesn't exit and shutdown the container. And it needs to keep listening on ports.
+            AssemblyLoadContext.Default.Unloading += _ => Exit();
+            Console.CancelKeyPress += (_, __) => Exit();
+
+            // Instantiation should be refatored to environment config files
+            IConnectionFactory factory = new ConnectionFactory() { HostName = "rabbit.docker" };
+            string exchangeName = "grabid_exchange";
+            List<DataSource> dataSources = LoadConfigurations();
+
+            RefinerService _refiner = new RefinerService(factory, exchangeName, dataSources);
+
+            _refiner.Start();
+            Log.Information("Refiner Started..");
+        }
+
+        private static List<DataSource> LoadConfigurations()
+        {
+            List<DataSource> dataSources = new List<DataSource>();
+
+            //Configurations for the one source
+            string keyOrigin = "mono.data.ingested";
+            string destination = "mono.data.refined";
+            List<DataHandler> dataHandlers = new List<DataHandler>();
+
+            IDBFacade db = new MongoDBConnector("mongodb://localhost:27017");
+
+            DataHandler handler = new DataHandler(
+                new TransactionDataProcessor(),
+                destination,
+                db
+                );
+            dataHandlers.Add(handler);
+            DataSource ds = new DataSource() {
+                DataHandlers = dataHandlers, KeyOrigin=keyOrigin
+            };
+            dataSources.Add(ds);
+            return dataSources; 
+        }
+    }
 }

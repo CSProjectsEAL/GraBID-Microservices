@@ -1,0 +1,8 @@
+[
+  {
+  "name": "FakeData",
+  "ApiUrl": "https://jsonplaceholder.typicode.com/posts",
+  "Credential": "",
+  "ForwardMessageQueue": "mono.queue.test"
+  }
+]
